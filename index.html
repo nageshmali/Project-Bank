@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Project Bank</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #f4f6f9;
+      padding: 30px;
+      color: #222;
+    }
+
+    h1 { margin-bottom: 24px; font-size: 22px; color: #1a1a2e; }
+    h2 { font-size: 15px; margin-bottom: 12px; color: #333; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    button {
+      width: 100%;
+      padding: 9px;
+      background: #1a1a2e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    button:hover { background: #16213e; }
+
+    .result {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .success { background: #e6f4ea; color: #2d6a4f; display: block; }
+    .error   { background: #fdecea; color: #b91c1c; display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    th { color: #888; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <h1>Project Bank</h1>
+
+  <div class="grid">
+
+    <!-- All Accounts -->
+    <div class="card">
+      <h2>All Accounts</h2>
+      <button onclick="getAccounts()">Load Accounts</button>
+      <div id="accountsResult" class="result"></div>
+    </div>
+
+    <!-- Create Account -->
+    <div class="card">
+      <h2>Create Account</h2>
+      <input id="newName"    type="text"   placeholder="Full Name" />
+      <input id="newBalance" type="number" placeholder="Initial Balance" />
+      <button onclick="createAccount()">Create</button>
+      <div id="createResult" class="result"></div>
+    </div>
+
+    <!-- Deposit -->
+    <div class="card">
+      <h2>Deposit</h2>
+      <input id="depositId"     type="number" placeholder="Account ID" />
+      <input id="depositAmount" type="number" placeholder="Amount" />
+      <button onclick="deposit()">Deposit</button>
+      <div id="depositResult" class="result"></div>
+    </div>
+
+    <!-- Withdraw -->
+    <div class="card">
+      <h2>Withdraw</h2>
+      <input id="withdrawId"     type="number" placeholder="Account ID" />
+      <input id="withdrawAmount" type="number" placeholder="Amount" />
+      <button onclick="withdraw()">Withdraw</button>
+      <div id="withdrawResult" class="result"></div>
+    </div>
+
+    <!-- Transfer -->
+    <div class="card">
+      <h2>Transfer</h2>
+      <input id="fromId"         type="number" placeholder="From Account ID" />
+      <input id="toId"           type="number" placeholder="To Account ID" />
+      <input id="transferAmount" type="number" placeholder="Amount" />
+      <button onclick="transfer()">Transfer</button>
+      <div id="transferResult" class="result"></div>
+    </div>
+
+    <!-- Delete Account -->
+    <div class="card">
+      <h2>Delete Account</h2>
+      <input id="deleteId" type="number" placeholder="Account ID" />
+      <button onclick="deleteAccount()">Delete</button>
+      <div id="deleteResult" class="result"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const BASE = "http://127.0.0.1:8000"
+
+    // helper functions - 2
+    function show(id, message, isError = false) {
+      const el = document.getElementById(id)
+      el.className = "result " + (isError ? "error" : "success")
+      el.innerHTML = message
+    }
+
+    // call API 
+    async function api(url, method = "GET", body = null) {
+      const options = {
+        method,
+        headers: { "Content-Type": "application/json" }
+      }
+      if (body) options.body = JSON.stringify(body)
+      const res = await fetch(BASE + url, options)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || "Something went wrong")
+      return data
+    }
+
+    // Get all accounts 
+    async function getAccounts() {
+      try {
+        const data = await api("/accounts")
+        const rows = data.map(a =>
+          `<tr><td>${a.id}</td><td>${a.name}</td><td>₹${a.balance.toLocaleString()}</td></tr>`
+        ).join("")
+        show("accountsResult",
+          `<table>
+            <tr><th>ID</th><th>Name</th><th>Balance</th></tr>
+            ${rows}
+          </table>`
+        )
+      } catch (e) { show("accountsResult", e.message, true) }
+    }
+
+    // Create account
+    async function createAccount() {
+      try {
+        const name    = document.getElementById("newName").value
+        const balance = parseFloat(document.getElementById("newBalance").value)
+        const data = await api("/accounts", "POST", { name, balance })
+        show("createResult", `${data.message} — ID: ${data.data.id}`)
+      } catch (e) { show("createResult", e.message, true) }
+    }
+
+    // Deposit 
+    async function deposit() {
+      try {
+        const id     = document.getElementById("depositId").value
+        const amount = parseFloat(document.getElementById("depositAmount").value)
+        const data   = await api(`/accounts/${id}/deposit?amount=${amount}`, "POST")
+        show("depositResult", `${data.message} — New Balance: ₹${data.balance.toLocaleString()}`)
+      } catch (e) { show("depositResult", e.message, true) }
+    }
+
+    // Withdraw 
+    async function withdraw() {
+      try {
+        const id     = document.getElementById("withdrawId").value
+        const amount = parseFloat(document.getElementById("withdrawAmount").value)
+        const data   = await api(`/accounts/${id}/withdraw?amount=${amount}`, "POST")
+        show("withdrawResult", `${data.message} — New Balance: ₹${data.balance.toLocaleString()}`)
+      } catch (e) { show("withdrawResult", e.message, true) }
+    }
+
+    // Transfer 
+    async function transfer() {
+      try {
+        const from_id = parseInt(document.getElementById("fromId").value)
+        const to_id   = parseInt(document.getElementById("toId").value)
+        const amount  = parseFloat(document.getElementById("transferAmount").value)
+        const data    = await api("/transfer", "POST", { from_id, to_id, amount })
+        show("transferResult", `${data.message}`)
+      } catch (e) { show("transferResult", e.message, true) }
+    }
+
+    // Delete account 
+    async function deleteAccount() {
+      try {
+        const id   = document.getElementById("deleteId").value
+        const data = await api(`/accounts/${id}`, "DELETE")
+        show("deleteResult", `${data.message}`)
+      } catch (e) { show("deleteResult", e.message, true) }
+    }
+  </script>
+
+</body>
+</html>
