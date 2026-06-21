@@ -29,7 +29,7 @@ class Account(BaseModel):
 class TransferRequest(BaseModel):
     from_id: int
     to_id: int
-    amount: float
+    amount: float 
 
 
 # Helper function
